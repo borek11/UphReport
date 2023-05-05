@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.3.32922.545
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UphReport", "UphReport\UphReport.csproj", "{C98D24E1-1FAB-464A-AFD1-4EFD599A7785}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C98D24E1-1FAB-464A-AFD1-4EFD599A7785}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C98D24E1-1FAB-464A-AFD1-4EFD599A7785}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C98D24E1-1FAB-464A-AFD1-4EFD599A7785}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C98D24E1-1FAB-464A-AFD1-4EFD599A7785}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {82B2FB72-83DD-4860-BE8B-9B4E0B29A4DD}
+	EndGlobalSection
+EndGlobal
