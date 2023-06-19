@@ -1,4 +1,5 @@
-﻿using UphReport.Models.Wave;
+﻿using UphReport.Entities.Wave;
+using UphReport.Models.Wave;
 
 namespace UphReport.Interfaces;
 
@@ -8,4 +9,6 @@ public interface IWaveAPIKeyService
     Task<string> GetAPIKey();
     Task DeleteDeprecatedKeys();
     Task UpdateKey(WaveAKUpdate waveAKUpdate);
+    Task<List<WaveAPIKey>> GetAll();
+    Task<bool> DeleteById(Guid guid);
 }

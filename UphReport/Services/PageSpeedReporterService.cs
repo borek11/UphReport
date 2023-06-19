@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.Extensions.Primitives;
 using Newtonsoft.Json;
 using System.Linq;
 using System.Net.Http;
@@ -245,6 +246,28 @@ namespace UphReport.Services
             return pageSpeedReport.Id;
         }
 
+        public async Task<int> SaveMultiReport(List<PageSpeedReport> pageSpeedReports)
+        {
+            int counter = 0;
+            foreach (var report in pageSpeedReports)
+            {
+                //Check if report exists in DB
+                var getReport = await _myDbContext.PageSpeedReports.FirstOrDefaultAsync(x => x.WebName.ToLower() == report.WebName.ToLower() && x.Strategy == report.Strategy);
+                if (getReport != null)
+                {
+                    var resultDelete = await DeleteReportAsync(getReport.Id);
+                }
+
+                var isSaved = await SaveReportAsync(report);
+                if (isSaved == Guid.Empty)
+                {
+                    throw new BadRequestException($"Error with save Report: {report.WebName}");
+                }
+                counter++;
+            }
+            return counter;
+        }
+
         public async Task<PageSpeedReport> GetReportFromDBAsync(Guid guid)
         {
             var result = await _myDbContext.PageSpeedReports
@@ -258,7 +281,30 @@ namespace UphReport.Services
             }
             return result;
         }
+        public async Task<List<PageSpeedMultiReportResponse>> GetOneReport(Guid webLinksId)
+        {
+            var psi = new List<PageSpeedMultiReportResponse>();
 
+            var result = await _myDbContext.PageSpeedReports
+                .Include(x => x.PageSpeedElement)
+                .Where(x => x.WebPageId == webLinksId).ToListAsync();
+
+            foreach (var report in result)
+            {
+                var psiReport = new PageSpeedMultiReportResponse()
+                {
+                    Id = report.Id,
+                    WebName = report.WebName,
+                    DateTime = report.Date,
+                    Result = report.Result,
+                    Strategy = report.Strategy,
+                    AmountOfErrors = report.PageSpeedElement.Where(x => x.TypeOfResult == TypeOfResult.ERROR).Count(),
+                    AmountOfPassed = report.PageSpeedElement.Where(x => x.TypeOfResult == TypeOfResult.PASSED).Count()
+                };
+                psi.Add(psiReport);
+            }
+            return psi;
+        }
 
         public async Task<bool> DeleteReportAsync(Guid guid)
         {
@@ -316,6 +362,38 @@ namespace UphReport.Services
                 psi.Add(psiReport);
             }
             return psi;
+        }
+
+        public async Task<List<PageSpeedAndWebLinks>> GetLinksAndReportAsync(string domainName, int strategy)
+        {
+            Strategy strategyFromRequest = new Strategy();
+            if (strategy == 0)
+                strategyFromRequest = Strategy.DESKTOP;
+            else if(strategy == 1)
+                strategyFromRequest = Strategy.MOBILE;
+
+            var linksFromDB = await _myDbContext.WebPages
+             .Where(x => x.DomainName == domainName)
+             .Select(x => new PageSpeedAndWebLinks()
+             {
+                 Id = x.Id,
+                 WebName = x.WebName,
+                 DomainName = x.DomainName
+             })
+             .ToListAsync();
+
+            foreach (var item in linksFromDB)
+            {
+                var report = await _myDbContext.PageSpeedReports.FirstOrDefaultAsync(x => x.WebPageId == item.Id && x.Strategy == strategyFromRequest);
+                if(report != null)
+                {
+                    item.ReportId = report.Id;
+                    item.Result = report.Result;
+                    item.Strategy = report.Strategy;
+                    item.DateTime = report.Date;
+                }
+            }
+            return linksFromDB;
         }
     }
 }

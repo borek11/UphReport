@@ -213,6 +213,10 @@ public class WaveReporterService : IWaveReporterService
                 {
                     var resultDelete = await DeleteReportAsync(getReport.Id);
                 }
+                if(waveRequests.VersionSystem != null)
+                    report.SystemVersion = waveRequests.VersionSystem;
+                if (waveRequests.VersionWave != null)
+                    report.WaveVersion = waveRequests.VersionWave;
 
                 var isSaved = await SaveReportAsync(report);
                 if (isSaved == Guid.Empty)
@@ -352,5 +356,65 @@ public class WaveReporterService : IWaveReporterService
             wave.Add(waveReport);
         }
         return wave;
+    }
+
+    public async Task<List<WaveMultiReportResponse>> GetOneReport(Guid webLinksId)
+    {
+        var wave = new List<WaveMultiReportResponse>();
+
+        var result = await _myDbContext.WaveReports
+            .Include(x => x.WaveElements)
+            .Where(x => x.WebPageId == webLinksId).ToListAsync();
+
+        foreach (var report in result)
+        {
+            var psiReport = new WaveMultiReportResponse()
+            {
+                Id = report.Id,
+                WebName = report.WebName,
+                DateTime = report.Date,
+                Strategy = report.Strategy,
+                AmountOfErrors = report.WaveElements.Where(x => x.TypeOfResult == TypeOfResult.ERROR).Count(),
+                AmountOfPassed = report.WaveElements.Where(x => x.TypeOfResult == TypeOfResult.PASSED).Count()
+            };
+            wave.Add(psiReport);
+        }
+        return wave;
+    }
+
+    public async Task<List<WaveAndWebLinks>> GetLinksAndReportAsync(string domainName, int strategy)
+    {
+        Strategy strategyFromRequest = new Strategy();
+        if (strategy == 0)
+            strategyFromRequest = Strategy.DESKTOP;
+        else if (strategy == 1)
+            strategyFromRequest = Strategy.MOBILE;
+
+        var linksFromDB = await _myDbContext.WebPages
+         .Where(x => x.DomainName == domainName)
+         .Select(x => new WaveAndWebLinks()
+         {
+             Id = x.Id,
+             WebName = x.WebName,
+             DomainName = x.DomainName
+         })
+         .ToListAsync();
+
+        foreach (var item in linksFromDB)
+        {
+            var report = await _myDbContext.WaveReports
+                .Include(x => x.WaveElements)
+                .FirstOrDefaultAsync(x => x.WebPageId == item.Id && x.Strategy == strategyFromRequest);
+            if (report != null)
+            {
+                item.ReportId = report.Id;
+                item.Strategy = report.Strategy;
+                item.DateTime = report.Date;
+                item.AmountOfPassed = report.WaveElements.Count(x => x.TypeOfResult == TypeOfResult.PASSED);
+                item.AmountOfWarnings = report.WaveElements.Count(x => x.TypeOfResult == TypeOfResult.WARNING);
+                item.AmountOfErrors = report.WaveElements.Count(x => x.TypeOfResult == TypeOfResult.ERROR);
+            }
+        }
+        return linksFromDB;
     }
 }

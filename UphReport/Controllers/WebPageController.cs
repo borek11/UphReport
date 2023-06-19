@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Azure.Core;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UphReport.Interfaces;
 using UphReport.Models.WebPage;
@@ -42,5 +43,28 @@ public class WebPageController : ControllerBase
         await _service.DeleteLinksAboutDomainAsync(domainName);
         return NoContent();
     }
-
+    [HttpGet("getAll")]
+    public async Task<IActionResult> GetAllAsync()
+    {
+        var result = await _service.GetAllUrlsAsync();
+        return Ok(result);
+    }
+    [HttpGet("getLinksDomain")]
+    public async Task<IActionResult> GetAllAsync(string domainName)
+    {
+        var result = await _service.GetAllUrlsAsync(domainName);
+        return Ok(result);
+    }
+    [HttpGet("getDomains")]
+    public async Task<IActionResult> GetAllDomainAsync()
+    {
+        var result = await _service.GetAllDomainAsync();
+        return Ok(result);
+    }
+    [HttpGet("getAmountDomain")]
+    public IActionResult GetAmountWeb(string domainName)
+    {
+        var result = _service.GetAmountWebAboutDomain(domainName);
+        return Ok(result);
+    }
 }

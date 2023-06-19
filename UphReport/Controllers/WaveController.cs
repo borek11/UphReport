@@ -77,11 +77,24 @@ public class WaveController : ControllerBase
         await _service.DeleteReportAsync(guid);
         return NoContent();
     }
+    
+    [HttpGet("getOne")]
+    public async Task<IActionResult> GetOne([FromQuery] Guid webLinksId)
+    {
+        var result = await _service.GetOneReport(webLinksId);
+        return Ok(result);
+    }
 
     [HttpGet("multiple")]
     public async Task<IActionResult> GetMultipleReportAsync([FromQuery] string domain)
     {
         var result = await _service.GetMultipleReport(domain);
+        return Ok(result);
+    }
+    [HttpGet("linksAndReports")]
+    public async Task<IActionResult> GetLinksAndReportsAsync([FromQuery] string domain, [FromQuery] int strategy)
+    {
+        var result = await _service.GetLinksAndReportAsync(domain, strategy);
         return Ok(result);
     }
 

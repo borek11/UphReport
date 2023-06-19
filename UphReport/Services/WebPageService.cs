@@ -12,6 +12,8 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
+using System.ComponentModel;
+using System.Collections.Specialized;
 
 namespace UphReport.Services
 {
@@ -160,6 +162,33 @@ namespace UphReport.Services
 
             return result;
         }
+        public Task<List<WebAllPageRequest>> GetAllUrlsAsync()
+        {
+            var result = _myDbContext.WebPages.Select(x=> new WebAllPageRequest()
+            {
+                Id = x.Id,
+                WebName=x.WebName,
+                DomainName = x.DomainName,
+                Date = x.Date,
+            }).ToListAsync();
+
+            return result;
+        }
+        public Task<List<WebAllPageRequest>> GetAllUrlsAsync(string domainName)
+        {
+            var result = _myDbContext.WebPages
+                .Where(x => x.DomainName.ToLower() == domainName.ToLower())
+                .Select(x => new WebAllPageRequest()
+            {
+                Id = x.Id,
+                WebName = x.WebName,
+                DomainName = x.DomainName,
+                Date = x.Date,
+            }).ToListAsync();
+
+            return result;
+        }
+
         public async Task<bool> DeleteLinkAsync(Guid guid)
         {
             var result = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.Id == guid);
@@ -182,6 +211,15 @@ namespace UphReport.Services
             await _myDbContext.SaveChangesAsync();
 
             return true;
+        }
+        public async Task<List<string>> GetAllDomainAsync()
+        {
+            var resutlt = await _myDbContext.WebPages.Select(x => x.DomainName).Distinct().ToListAsync();
+            return resutlt;
+        }
+        public int GetAmountWebAboutDomain(string domainName)
+        {
+            return _myDbContext.WebPages.Count(x => x.DomainName.ToLower() == domainName.ToLower());
         }
 
         private List<string> Filter(List<string> currentLinks, string currentPage, string domain)

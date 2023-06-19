@@ -40,6 +40,11 @@ public class WaveAPIKeyController : ControllerBase
 			return Ok(result);
 		}
 	}
+	[HttpGet("getAll")]
+	public async Task<IActionResult> GetAllKey()
+	{
+		return Ok(await _service.GetAll());
+	}
 	[HttpDelete]
 	public async Task<IActionResult> DeleteDeprectedKeys()
 	{
@@ -52,5 +57,13 @@ public class WaveAPIKeyController : ControllerBase
 		await _service.UpdateKey(waveAKUpdate);
 		return NoContent();
     }
+	[HttpDelete("deleteById")]
+	public async Task<IActionResult> DeleteById(Guid guid)
+	{
+		var result = await _service.DeleteById(guid);
+		if (!result)
+			return NotFound();
+		return NoContent();
+	}
 
 }

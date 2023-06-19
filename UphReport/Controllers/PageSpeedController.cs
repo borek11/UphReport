@@ -48,7 +48,14 @@ public class PageSpeedController : ControllerBase
 		//return BadRequest();
 		return Ok();
 	}
-	[HttpGet]
+
+    [HttpPost("multiSave")]
+    public async Task<IActionResult> SaveMultiReportAsync(List<PageSpeedReport> pageSpeedReports)
+    {
+		var result = await _service.SaveMultiReport(pageSpeedReports);
+        return Ok(result);
+    }
+    [HttpGet]
 	public async Task<IActionResult> GetReportFromDBAsync(Guid guid)
 	{
 		var result = await _service.GetReportFromDBAsync(guid);
@@ -60,11 +67,23 @@ public class PageSpeedController : ControllerBase
 		await _service.DeleteReportAsync(guid);
 		return NoContent();
 	}
-	[HttpGet("multiple")]
+    [HttpGet("getOne")]
+    public async Task<IActionResult> GetOne([FromQuery] Guid webLinksId)
+    {
+        var result = await _service.GetOneReport(webLinksId);
+        return Ok(result);
+    }
+    [HttpGet("multiple")]
 	public async Task<IActionResult> GetMultipleReportAsync([FromQuery]string domain)
 	{
 		var result = await _service.GetMultipleReport(domain);
 		return Ok(result);
 	}
+	[HttpGet("linksAndReports")]
+    public async Task<IActionResult> GetLinksAndReportsAsync([FromQuery] string domain, [FromQuery] int strategy)
+    {
+        var result = await _service.GetLinksAndReportAsync(domain, strategy);
+        return Ok(result);
+    }
 
 }

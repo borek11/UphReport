@@ -1,5 +1,6 @@
 ﻿using UphReport.Entities.PageSpeedInsights;
 using UphReport.Entities.Wave;
+using UphReport.Models.PSI;
 using UphReport.Models.Wave;
 
 namespace UphReport.Interfaces;
@@ -13,5 +14,8 @@ public interface IWaveReporterService
     Task<Guid> SaveReportAsync(WaveReport waveReport);
     Task<WaveReport> GetReportFromDBAsync(Guid guid);
     Task<bool> DeleteReportAsync(Guid guid);
+    Task<List<WaveMultiReportResponse>> GetOneReport(Guid webLinksId);
     Task<List<WaveMultiReportResponse>> GetMultipleReport(string domain);
+    Task<List<WaveAndWebLinks>> GetLinksAndReportAsync(string domainName, int strategy);
+
 }

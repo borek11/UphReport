@@ -19,6 +19,11 @@ public class WaveAPIKeyService : IWaveAPIKeyService
 		_mapper = mapper;
 	}
 
+	public async Task<List<WaveAPIKey>> GetAll()
+	{
+		return await _myDbContext.WaveAPIKeys.ToListAsync();
+	}
+
 	public async Task<bool> AddKey(WaveAKRequest key)
 	{
 		var waveAPIKey = _mapper.Map<WaveAPIKey>(key);
@@ -66,5 +71,17 @@ public class WaveAPIKeyService : IWaveAPIKeyService
         }
 
 		await _myDbContext.SaveChangesAsync();
+	}
+	public async Task<bool> DeleteById(Guid guid)
+	{
+		var apiKey = await _myDbContext.WaveAPIKeys.FirstOrDefaultAsync(x => x.Id == guid);
+		var result = false;
+		if(apiKey != null)
+		{
+            _myDbContext.WaveAPIKeys.Remove(apiKey);
+			result = true;
+			await _myDbContext.SaveChangesAsync();
+        }
+		return result;
 	}
 }
