@@ -35,15 +35,15 @@ namespace UphReport.Seeder
             {
                 new Role()
                 {
+                    Name = "Admin"
+                },
+                new Role()
+                {
                     Name = "User"
                 },
                 new Role()
                 {
-                    Name = "Manager"
-                },
-                new Role()
-                {
-                    Name = "Admin"
+                    Name = "Blocked"
                 }
             };
             return roles;

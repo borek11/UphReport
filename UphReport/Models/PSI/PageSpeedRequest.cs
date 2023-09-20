@@ -8,4 +8,5 @@ public class PageSpeedRequest
     public bool Save { get; set; }
     public bool GenerateForExistsReport { get; set; }
     public Strategy Strategy { get; set; }
+    public string DomainName { get; set; }
 };

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UphReport.Entities.PageSpeedInsights;
 using UphReport.Entities.Wave;
@@ -9,6 +10,7 @@ using UphReport.Models.Wave;
 namespace UphReport.Controllers;
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class WaveController : ControllerBase
 {
 	private readonly IWaveReporterService _service;
@@ -43,7 +45,9 @@ public class WaveController : ControllerBase
     [HttpPost("report")]
     public async Task<IActionResult> GetReportsAsync([FromBody] WaveRequests waveRequests)
     {
-        var result = await _service.GetReportsAsync(waveRequests);
+        string token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+
+        var result = await _service.GetReportsAsync(waveRequests, token);
         return Ok(result);
     }
 
@@ -96,6 +100,19 @@ public class WaveController : ControllerBase
     {
         var result = await _service.GetLinksAndReportAsync(domain, strategy);
         return Ok(result);
+    }
+    [HttpGet("getByUser")]
+    public async Task<IActionResult> GetReportsByUser([FromQuery] int id)
+    {
+        var response = await _service.GetMultipleReportByUser(id);
+        return Ok(response);
+    }
+    [HttpGet("getDomain")]
+    public async Task<IActionResult> GetDomainName([FromQuery] Guid guid)
+    {
+        var response = await _service.GetDomainByReportId(guid);
+
+        return Ok(response);
     }
 
 }

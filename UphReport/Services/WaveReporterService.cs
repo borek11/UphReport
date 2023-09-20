@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using System.IdentityModel.Tokens.Jwt;
 using UphReport.Data;
 using UphReport.Entities.PageSpeedInsights;
 using UphReport.Entities.Wave;
@@ -171,17 +172,27 @@ public class WaveReporterService : IWaveReporterService
 
 		return waveReport;
 	}
-	public async Task<List<WaveReport>> GetReportsAsync(WaveRequests waveRequests)
+	public async Task<List<WaveReport>> GetReportsAsync(WaveRequests waveRequests, string token)
 	{
-		var reports = new List<WaveReport>();
+        var userId = await GetUserId(token);
 
-		foreach (var url in waveRequests.Urls)
+        var reports = new List<WaveReport>();
+
+        var webId = new Guid[waveRequests.Urls.Count];
+        int counter = 0;
+
+        foreach (var url in waveRequests.Urls)
 		{
 			if(waveRequests.GenerateForExistsReport is true)
 			{
                 //check if url exist in webPage Table
                 await _webPageService.CheckInDBAsync(url);
-                var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower());
+                //var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower());
+                var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower() && x.DomainName == waveRequests.DomainName);
+
+                if (guidWebLink != null)
+                    webId[counter] = guidWebLink.Id;
+
                 //generowanie raportu, czy istnieje raport w db czy nie
                 var report = await ReportCleanAsync(url, waveRequests.Strategy);
                 report.WebPageId = guidWebLink.Id;
@@ -194,21 +205,29 @@ public class WaveReporterService : IWaveReporterService
                 {
                     //check if url exist in webPage Table
                     await _webPageService.CheckInDBAsync(url);
-                    var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower());
+                    //var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower());
+                    var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower() && x.DomainName == waveRequests.DomainName);
+
+                    if (guidWebLink != null)
+                        webId[counter] = guidWebLink.Id;
 
                     var report = await ReportCleanAsync(url, waveRequests.Strategy);
                     report.WebPageId = guidWebLink.Id;
                     reports.Add(report);
                 }
             }
-		}
+            counter++;
+        }
+
+        counter = 0;
 
         if (waveRequests.Save is true)
         {
             foreach (var report in reports)
             {
                 //Check if report exists in DB
-                var getReport = await _myDbContext.WaveReports.FirstOrDefaultAsync(x => x.WebName.ToLower() == report.WebName.ToLower() && x.Strategy == waveRequests.Strategy);
+                    //var getReport = await _myDbContext.WaveReports.FirstOrDefaultAsync(x => x.WebName.ToLower() == report.WebName.ToLower() && x.Strategy == waveRequests.Strategy);
+                var getReport = await _myDbContext.WaveReports.FirstOrDefaultAsync(x => x.WebPageId == webId[counter] && x.Strategy == waveRequests.Strategy);
                 if (getReport != null)
                 {
                     var resultDelete = await DeleteReportAsync(getReport.Id);
@@ -218,11 +237,15 @@ public class WaveReporterService : IWaveReporterService
                 if (waveRequests.VersionWave != null)
                     report.WaveVersion = waveRequests.VersionWave;
 
+                report.CreatedById = userId;
+
                 var isSaved = await SaveReportAsync(report);
                 if (isSaved == Guid.Empty)
                 {
                     throw new BadRequestException($"Error with save Report: {report.WebName}");
                 }
+
+                counter++;
             }
         }
 		return reports;
@@ -351,7 +374,9 @@ public class WaveReporterService : IWaveReporterService
                 DateTime = report.Date,
                 Strategy = report.Strategy,
                 AmountOfErrors = report.WaveElements.Where(x => x.TypeOfResult == TypeOfResult.ERROR).Count(),
-                AmountOfPassed = report.WaveElements.Where(x => x.TypeOfResult == TypeOfResult.PASSED).Count()
+                AmountOfPassed = report.WaveElements.Where(x => x.TypeOfResult == TypeOfResult.PASSED).Count(),
+                SystemVersion = report.SystemVersion,
+                WaveVersion = report.WaveVersion
             };
             wave.Add(waveReport);
         }
@@ -381,7 +406,29 @@ public class WaveReporterService : IWaveReporterService
         }
         return wave;
     }
+    public async Task<List<WaveMultiReportResponse>> GetMultipleReportByUser(int userId)
+    {
+        var wave = new List<WaveMultiReportResponse>();
+        var response = await _myDbContext.WaveReports
+            .Include(x => x.WaveElements)
+            .Where(x => x.CreatedById == userId)
+            .ToListAsync();
 
+        foreach (var report in response)
+        {
+            var waveReport = new WaveMultiReportResponse()
+            {
+                Id = report.Id,
+                WebName = report.WebName,
+                DateTime = report.Date,
+                Strategy = report.Strategy,
+                AmountOfErrors = report.WaveElements.Where(x => x.TypeOfResult == TypeOfResult.ERROR).Count(),
+                AmountOfPassed = report.WaveElements.Where(x => x.TypeOfResult == TypeOfResult.PASSED).Count()
+            };
+            wave.Add(waveReport);
+        }
+        return wave;
+    }
     public async Task<List<WaveAndWebLinks>> GetLinksAndReportAsync(string domainName, int strategy)
     {
         Strategy strategyFromRequest = new Strategy();
@@ -416,5 +463,35 @@ public class WaveReporterService : IWaveReporterService
             }
         }
         return linksFromDB;
+    }
+    public async Task<string> GetDomainByReportId(Guid reportId)
+    {
+        var webPageId = await _myDbContext.WaveReports.FirstOrDefaultAsync(x => x.Id == reportId);
+        if (webPageId == null)
+        {
+            throw new NotFoundException($"Nie znaleziono Raportu!");
+        }
+        var result = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.Id == webPageId.WebPageId);
+
+        if (result == null)
+        {
+            throw new NotFoundException($"Nie znaleziono Raportu!");
+        }
+
+        return result.DomainName;
+    }
+    private async Task<int> GetUserId(string token)
+    {
+        var handler = new JwtSecurityTokenHandler();
+        var jwtSecurityToken = handler.ReadJwtToken(token);
+        var userId = jwtSecurityToken.Claims.First(claim => claim.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier").Value;
+
+        var user = await _myDbContext.Users.FirstOrDefaultAsync(u => u.Id == int.Parse(userId));
+
+        if (user == null)
+        {
+            throw new NotFoundException($"Nie znaleziono użytkownika!");
+        }
+        return user.Id;
     }
 }

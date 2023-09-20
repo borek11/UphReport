@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Primitives;
 using Newtonsoft.Json;
+using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
@@ -11,6 +12,7 @@ using UphReport.Entities.PageSpeedInsights;
 using UphReport.Exceptions;
 using UphReport.Interfaces;
 using UphReport.Models.PSI;
+using UphReport.Models.User;
 
 namespace UphReport.Services
 {
@@ -130,10 +132,14 @@ namespace UphReport.Services
             
             return pageSpeedReport;
         }
-        public async Task<List<PageSpeedReport>> GetReportsAsync(PageSpeedRequest reportRequest)
+        public async Task<List<PageSpeedReport>> GetReportsAsync(PageSpeedRequest reportRequest, string token)
         {
-            
+            var userId = await GetUserId(token);
+
             var reports = new List<PageSpeedReport>();
+
+            var webId = new Guid[reportRequest.Urls.Count];
+            int counter = 0;
 
             foreach (var url in reportRequest.Urls)
             {
@@ -141,7 +147,11 @@ namespace UphReport.Services
                 {
                     //check if url exist in webPage Table
                     await _webPageService.CheckInDBAsync(url);
-                    var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower());
+                        //var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower());
+                    var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower() && x.DomainName == reportRequest.DomainName);
+                    
+                    if (guidWebLink != null)
+                        webId[counter] = guidWebLink.Id;
                     //generowanie raportu, czy istnieje raport w db czy nie
                     var report = await ReportCleanAsync(url, reportRequest.Strategy);
                     report.WebPageId = guidWebLink.Id;
@@ -154,31 +164,41 @@ namespace UphReport.Services
                     {
                         //check if url exist in webPage Table
                         await _webPageService.CheckInDBAsync(url);
-                        var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower());
+                            //var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower());
+                        var guidWebLink = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower() && x.DomainName == reportRequest.DomainName);
+
+                        if (guidWebLink != null)
+                            webId[counter] = guidWebLink.Id;
 
                         var report = await ReportCleanAsync(url,reportRequest.Strategy);
                         report.WebPageId = guidWebLink.Id;
                         reports.Add(report);
                     }
                 }
+                counter++;
             }
+
+            counter = 0;
 
             if (reportRequest.Save is true)
             {
                 foreach (var report in reports)
                 {
                     //Check if report exists in DB
-                    var getReport = await _myDbContext.PageSpeedReports.FirstOrDefaultAsync(x => x.WebName.ToLower() == report.WebName.ToLower() && x.Strategy == reportRequest.Strategy);
+                        //var getReport = await _myDbContext.PageSpeedReports.FirstOrDefaultAsync(x => x.WebName.ToLower() == report.WebName.ToLower() && x.Strategy == reportRequest.Strategy);
+                    var getReport = await _myDbContext.PageSpeedReports.FirstOrDefaultAsync(x => x.WebPageId == webId[counter] && x.Strategy == reportRequest.Strategy);
                     if (getReport != null)
                     {
                         var resultDelete = await DeleteReportAsync(getReport.Id);
                     }
-                
+                    report.CreatedById = userId;
                     var isSaved = await SaveReportAsync(report);
                     if(isSaved == Guid.Empty)
                     {
                         throw new BadRequestException($"Error with save Report: {report.WebName}");
                     }
+
+                    counter++;
                 }
             }
 
@@ -201,7 +221,8 @@ namespace UphReport.Services
                 }
                 else
                 {
-                    var getReport = await _myDbContext.PageSpeedReports.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.WebName.ToLower() && x.Strategy == pageSpeedRequestDomain.Strategy);
+                    //var getReport = await _myDbContext.PageSpeedReports.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.WebName.ToLower() && x.Strategy == pageSpeedRequestDomain.Strategy);
+                    var getReport = await _myDbContext.PageSpeedReports.FirstOrDefaultAsync(x => x.WebPageId == url.Id && x.Strategy == pageSpeedRequestDomain.Strategy);
                     if (getReport == null)
                     {
                         //check if url exist in webPage Table
@@ -272,7 +293,7 @@ namespace UphReport.Services
         {
             var result = await _myDbContext.PageSpeedReports
                 .Include(x => x.PageSpeedElement)
-                    .ThenInclude(y => y.PageSpeedSubElement)
+                    .ThenInclude(y => y.PageSpeedSubElement)               
                 .FirstOrDefaultAsync(x => x.Id == guid);
             
             if(result == null)
@@ -343,8 +364,7 @@ namespace UphReport.Services
 
             var reportsFromDB = await _myDbContext.PageSpeedReports
                 .Include(x => x.PageSpeedElement)
-                .Where(x => linksFromDB
-                .Contains(x.WebPageId))
+                .Where(x => linksFromDB.Contains(x.WebPageId))
                 .ToListAsync();
             
             foreach (var report in reportsFromDB)
@@ -363,6 +383,31 @@ namespace UphReport.Services
             }
             return psi;
         }
+        public async Task<List<PageSpeedMultiReportResponse>> GetMultipleReportByUser(int userId)
+        {
+            var psi = new List<PageSpeedMultiReportResponse>();
+            var response = await _myDbContext.PageSpeedReports
+                .Include(x => x.PageSpeedElement)
+                .Where(x => x.CreatedById == userId)
+                .ToListAsync();
+
+            foreach (var report in response)
+            {
+                var psiReport = new PageSpeedMultiReportResponse()
+                {
+                    Id = report.Id,
+                    WebName = report.WebName,
+                    DateTime = report.Date,
+                    Result = report.Result,
+                    Strategy = report.Strategy,
+                    AmountOfErrors = report.PageSpeedElement.Where(x => x.TypeOfResult == TypeOfResult.ERROR).Count(),
+                    AmountOfPassed = report.PageSpeedElement.Where(x => x.TypeOfResult == TypeOfResult.PASSED).Count()
+                };
+                psi.Add(psiReport);
+            }
+            return psi;
+        }
+
 
         public async Task<List<PageSpeedAndWebLinks>> GetLinksAndReportAsync(string domainName, int strategy)
         {
@@ -395,5 +440,38 @@ namespace UphReport.Services
             }
             return linksFromDB;
         }
+
+        public async Task<string> GetDomainByReportId(Guid reportId)
+        {
+            var webPageId = await _myDbContext.PageSpeedReports.FirstOrDefaultAsync(x => x.Id == reportId);
+            if(webPageId == null)
+            {
+                throw new NotFoundException($"Nie znaleziono Raportu!");
+            }
+            var result = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.Id == webPageId.WebPageId);
+
+            if (result == null)
+            {
+                throw new NotFoundException($"Nie znaleziono Raportu!");
+            }
+
+            return result.DomainName;
+        }
+
+        private async Task<int> GetUserId(string token)
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var jwtSecurityToken = handler.ReadJwtToken(token);
+            var userId = jwtSecurityToken.Claims.First(claim => claim.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier").Value;
+
+            var user = await _myDbContext.Users.FirstOrDefaultAsync(u => u.Id == int.Parse(userId));
+
+            if (user == null)
+            {
+                throw new NotFoundException($"Nie znaleziono użytkownika!");
+            }
+            return user.Id;
+        }
+
     }
 }

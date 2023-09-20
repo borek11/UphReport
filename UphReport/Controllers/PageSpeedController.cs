@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UphReport.Entities.PageSpeedInsights;
 using UphReport.Interfaces;
@@ -8,6 +9,7 @@ namespace UphReport.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class PageSpeedController : ControllerBase
 {
 	private readonly IPageSpeedService _service;
@@ -24,14 +26,16 @@ public class PageSpeedController : ControllerBase
 	}
 
 	[HttpPost("report")]
-	public async Task<IActionResult> GetReportsAsyns([FromBody]PageSpeedRequest pageSpeedRequest)
+	public async Task<IActionResult> GetReportsAsync([FromBody]PageSpeedRequest pageSpeedRequest)
 	{
-		var result = await _service.GetReportsAsync(pageSpeedRequest);
+        string token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+
+        var result = await _service.GetReportsAsync(pageSpeedRequest, token);
 		return Ok(result);
 	}
 
     [HttpPost("reportDomain")]
-    public async Task<IActionResult> GetReportsDomainAsyns([FromBody] PageSpeedRequestDomain pageSpeedRequestDomain)
+    public async Task<IActionResult> GetReportsDomainAsync([FromBody] PageSpeedRequestDomain pageSpeedRequestDomain)
     {
         var result = await _service.GetReportsAsync(pageSpeedRequestDomain);
         return Ok(result);
@@ -86,4 +90,17 @@ public class PageSpeedController : ControllerBase
         return Ok(result);
     }
 
+	[HttpGet("getByUser")]
+	public async Task<IActionResult> GetReportsByUser([FromQuery]int id)
+	{
+		var response = await _service.GetMultipleReportByUser(id);
+		return Ok(response);
+	}
+	[HttpGet("getDomain")]
+	public async Task<IActionResult> GetDomainName([FromQuery] Guid guid)
+	{
+		var response = await _service.GetDomainByReportId(guid);
+
+		return Ok(response);
+	}
 }

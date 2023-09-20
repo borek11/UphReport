@@ -10,4 +10,5 @@ public class WaveRequests
     public Strategy Strategy { get; set; }
     public string VersionWave { get; set; }
     public string VersionSystem { get; set; }
+    public string DomainName { get; set; }
 }

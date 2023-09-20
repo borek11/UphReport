@@ -10,4 +10,6 @@ public class WaveMultiReportResponse
     public int AmountOfPassed { get; set; }
     public DateTime DateTime { get; set; }
     public Strategy? Strategy { get; set; }
+    public string? WaveVersion { get; set; }
+    public string? SystemVersion { get; set; }
 }

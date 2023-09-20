@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.ComponentModel;
 using System.Collections.Specialized;
+using System.Xml.Linq;
 
 namespace UphReport.Services
 {
@@ -30,7 +31,7 @@ namespace UphReport.Services
         public async Task<bool> CheckInDBAsync(string url)
         {
             var ifExist = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.WebName.ToLower() == url.ToLower());
-
+            
             if (ifExist != null)
             {
                 return true;
@@ -194,6 +195,38 @@ namespace UphReport.Services
             var result = await _myDbContext.WebPages.FirstOrDefaultAsync(x => x.Id == guid);
             if (result == null)
                 throw new NotFoundException("Link with given id not found");
+
+            var psiReports = await _myDbContext.PageSpeedReports
+                .Where(x => x.WebPageId == guid)
+                .Include(x => x.PageSpeedElement)
+                    .ThenInclude(y => y.PageSpeedSubElement)
+                .ToListAsync();
+            foreach (var report in psiReports)
+            {
+                _myDbContext.PageSpeedSubElements.RemoveRange(report.PageSpeedElement.SelectMany(tb => tb.PageSpeedSubElement).ToList());
+
+                //Delete From PageSpeedElements
+                _myDbContext.PageSpeedElements.RemoveRange(report.PageSpeedElement);
+
+                //Delete From PageSpeedReport
+                _myDbContext.PageSpeedReports.Remove(report);
+            }
+
+            var waveReports = await _myDbContext.WaveReports
+                .Where(x => x.WebPageId == guid)
+                .Include(x => x.WaveElements)
+                    .ThenInclude(y => y.WaveSubElements)
+                .ToListAsync();
+            foreach (var report in waveReports)
+            {
+                _myDbContext.WaveSubElements.RemoveRange(report.WaveElements.SelectMany(tb => tb.WaveSubElements).ToList());
+
+                //Delete From WaveElements
+                _myDbContext.WaveElements.RemoveRange(report.WaveElements);
+
+                //Delete From WaveSpeedReport
+                _myDbContext.WaveReports.Remove(report);
+            }
 
             _myDbContext.WebPages.Remove(result);
             await _myDbContext.SaveChangesAsync();
